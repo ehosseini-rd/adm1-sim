@@ -1,0 +1,44 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "Your Name"
+  description: "Research | Publications | Teaching"
+  site-url: https://your-username.github.io
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: publications.qmd
+        text: Publications
+      - href: research.qmd
+        text: Research
+      - href: teaching.qmd
+        text: Teaching
+      - href: blog/index.qmd
+        text: Blog
+    right:
+      - icon: github
+        href: https://github.com/your-username
+      - icon: twitter
+        href: https://twitter.com/your-handle
+      - icon: envelope
+        href: mailto:you@university.edu
+  page-footer:
+    left: "© {{< today >}} Your Name"
+    right: "Built with <a href='https://quarto.org'>Quarto</a>"
+
+format:
+  html:
+    theme:
+      light: cosmo
+      dark: darkly
+    toc: true
+    smooth-scroll: true
+    code-fold: false
+    number-sections: false
+    css: styles.css
+
+metadata-files:
+  - _params.yml

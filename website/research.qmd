@@ -1,0 +1,12 @@
+---
+title: "Research"
+---
+
+## Modeling & Simulation
+Describe your work with ADM1 simulation, reactor modeling, co-digestion scenarios.
+
+## Optimization & Control
+Outline parameter estimation, scenario comparison tooling, and decision-support.
+
+## Sustainability & Systems Analysis
+Life cycle or techno-economic assessments linked to digestion models.

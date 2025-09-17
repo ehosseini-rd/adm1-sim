@@ -1,0 +1,11 @@
+---
+title: "Blog"
+listing:
+  contents: posts
+  sort: "date desc"
+  type: default
+  categories: true
+  filter-ui: true
+---
+
+Short introduction describing what you write about (research notes, reproducible workflows, data tips).

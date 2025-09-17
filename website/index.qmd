@@ -1,0 +1,24 @@
+---
+title: "About"
+image: images/profile.jpg
+---
+
+## About Me
+
+Short professional bio (2–3 sentences) highlighting research focus, methods, and application domain.
+
+- Position: PhD Candidate, Department of X
+- Research Areas: Anaerobic digestion modeling, process optimization, sustainability
+- Keywords: ADM1, biogas, process simulation
+
+## Highlights
+
+- 10+ peer-reviewed publications
+- Reviewer for Journal ABC
+- Open-source contributor (see [GitHub](https://github.com/your-username))
+
+## Quick Links
+
+- [CV](cv.pdf)
+- [Google Scholar](_params.yml)
+- [Email](mailto:you@university.edu)

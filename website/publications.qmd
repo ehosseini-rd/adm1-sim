@@ -1,0 +1,40 @@
+---
+title: "Publications"
+page-layout: full
+---
+
+Below is an auto-generated list of publications. Update `publications.bib` and re-render.
+
+::: {.pub-list}
+```{r}
+#| echo: false
+# (In Quarto with knitr or python; you can also use a Lua filter.)
+```
+:::
+
+### Selected Publications
+
+1. Doe, J., You, Y. (2025). Advanced modeling of anaerobic co-digestion. *Journal of Bioprocess Engineering*.
+2. You, Y., et al. (2024). Sensitivity analysis of ADM1 parameters. *Waste Management*.
+
+### Full List (from BibTeX)
+
+```{python}
+import bibtexparser, textwrap, json, pathlib
+bib_path = pathlib.Path('publications.bib')
+if bib_path.exists():
+    with open(bib_path) as f:
+        db = bibtexparser.load(f)
+    for entry in db.entries:
+        authors = entry.get('author','').replace('\n',' ')
+        title = entry.get('title','').rstrip('.')
+        year = entry.get('year','')
+        journal = entry.get('journal', entry.get('booktitle',''))
+        doi = entry.get('doi','')
+        line = f"{authors} ({year}). {title}. *{journal}*."
+        if doi:
+            line += f" doi:{doi}"
+        print(line)
+else:
+    print('Add a publications.bib file to enable auto-listing.')
+```

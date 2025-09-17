@@ -1,7 +1,0 @@
----
-title: "Welcome & Project Overview"
-date: 2025-09-17
-categories: [intro, adm1]
----
-
-Launching my academic site. I will share progress on anaerobic digestion modeling, scenario comparison tooling, and reproducible simulation workflows.

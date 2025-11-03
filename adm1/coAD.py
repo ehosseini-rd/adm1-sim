@@ -1,14 +1,9 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from scipy import integrate
 #from adm1.ode import ADM1_ODE
-import scipy
 # Import custom plotting functions
-from adm1 import params
-from adm1_params import S_gas_h2
-from plot_utils import plot_biomass_and_substrate, plot_gas_and_inhibition, plot_ph
 from adm1.influent import reactor_setup
+from adm1.influent import mix_influent_with_recycle
 from adm1.influent import get_influent
 from adm1.initial_state import get_initial_state
 from adm1.params import PARAMETER_SETS, set_global_params_from_dict
@@ -17,108 +12,42 @@ from adm1.params import get_adm1_params
 from adm1.dae import DAESolve  # pure DAE solver
 from adm1.solver import simulate
 from adm1.params import get_VSS 
+from adm1.influent import rescale_influent
+from .inhibition import compute_inhibition_factors
 
 
 def ADM1_coAD(
-    q_ad_init=500,              # Initial influent flow rate [m^3/d]
-    density=1,               # Influent density [tonne/m^3]
-    VS_per_TS=0.9,            # Volatile solids per  total solids [kg VS/kg TS]     
-    TS_fraction=0.03,        # Fraction of TS in influent
-    mixing_ratio=0.99999,       # Fraction for feed 1 / total (can be overridden per scenario)
-    OLR=5,                      # Organic Loading Rate [kg VS/m3/d]
-    T_ad =  308.15, #K
-    T_base =  298.15, #K
-    T_op =  308.15, #k ##T_ad #=35 C
-    influent=None,              # Optional: pass custom influent dict
-    initials=None,              # Optional: pass custom initial state dict
-    recycle_ratio=0.2               
+    q_ad_init,              # Initial influent flow rate [m^3/d]
+    density,               # Influent density [tonne/m^3]
+    VS_per_TS_PS,            # Volatile solids per  total solids [kg VS/kg TS]     
+    VS_per_TS_SS,
+    TS_fraction,        # Fraction of TS in influent
+    mixing_ratio,       # Fraction for feed 1 / total (can be overridden per scenario)
+    mixing_ratio2,      # Fraction for PS / total (can be overridden per scenario)
+    OLR,                      # Organic Loading Rate [kg VS/m3/d]
+    T_ad, #K
+    T_base, #K
+    T_op, #k ##T_ad #=35 C
+    recycle_ratio,
+    influent,              # Optional: pass custom influent dict
+    initials,              # Optional: pass custom initial state dict
+    VSS,                    # Optional: pass custom VSS value
+    days,                   # Number of days to simulate
+    timesteps,              #"Day(s)", "15 Minute(s)","Hour(s)"
+    V_liq,                    # Optional: pass custom reactor liquid volume [m^3]
+    param_overrides,        # Optional: dict of parameter overrides (e.g., k_L_a, k_p, K_H_*)
+    disable_inhibition: bool,  # If True, force all inhibition factors to 1
+    Batch_process: bool, # If True, simulate a batch process (no influent flow)
 ):
 
 
     if influent is None:
-        influent = get_influent(mixing_ratio)
+        influent = get_influent(mixing_ratio, mixing_ratio2)
     else:
         influent = influent
-    S_su_in = influent['S_su_in']
-    S_aa_in = influent['S_aa_in']
-    S_fa_in = influent['S_fa_in']
-    S_va_in = influent['S_va_in']
-    S_bu_in = influent['S_bu_in']
-    S_pro_in = influent['S_pro_in']
-    S_ac_in = influent['S_ac_in']
-    S_h2_in = influent['S_h2_in']
-    S_ch4_in = influent['S_ch4_in']
-    S_IC_in = influent['S_IC_in']
-    S_IN_in = influent['S_IN_in']
-    S_I_in = influent['S_I_in']
-    X_xc1_in = influent['X_xc1_in']
-    X_ch1_in = influent['X_ch1_in']
-    X_pr1_in = influent['X_pr1_in']
-    X_li1_in = influent['X_li1_in']
-    X_xc2_in = influent['X_xc2_in']
-    X_ch2_in = influent['X_ch2_in']
-    X_pr2_in = influent['X_pr2_in']
-    X_li2_in = influent['X_li2_in']
-    X_su_in = influent['X_su_in']
-    X_aa_in = influent['X_aa_in']
-    X_fa_in = influent['X_fa_in']
-    X_c4_in = influent['X_c4_in']
-    X_pro_in = influent['X_pro_in']
-    X_ac_in = influent['X_ac_in']
-    X_h2_in = influent['X_h2_in']
-    X_I_in = influent['X_I_in']
-    S_cation_in = influent['S_cation_in']
-    S_anion_in = influent['S_anion_in']
-
-    state_input = [S_su_in,
-                S_aa_in,
-                S_fa_in,
-                S_va_in,
-                S_bu_in,
-                S_pro_in,
-                S_ac_in,
-                S_h2_in,
-                S_ch4_in,
-                S_IC_in,
-                S_IN_in,
-                S_I_in,
-                X_xc1_in,
-                X_ch1_in,
-                X_pr1_in,
-                X_li1_in,
-                X_xc2_in,
-                X_ch2_in,
-                X_pr2_in,
-                X_li2_in,
-                X_su_in,
-                X_aa_in,
-                X_fa_in,
-                X_c4_in,
-                X_pro_in,
-                X_ac_in,
-                X_h2_in,
-                X_I_in,
-                S_cation_in,
-                S_anion_in]
-
-
-
+    
 
     ########################################
-
-
-    input_labels = [
-        "S_su_in", "S_aa_in", "S_fa_in", "S_va_in", "S_bu_in", "S_pro_in", "S_ac_in", 
-        "S_h2_in", "S_ch4_in", "S_IC_in", "S_IN_in", "S_I_in", "X_xc1_in", "X_ch1_in", 
-        "X_pr1_in", "X_li1_in", "X_xc2_in", "X_ch2_in", "X_pr2_in", "X_li2_in", "X_su_in", 
-        "X_aa_in", "X_fa_in", "X_c4_in", "X_pro_in", "X_ac_in", "X_h2_in", "X_I_in", 
-        "S_cation_in", "S_anion_in"
-    ]
-
-    #print("\nState Input Values:")
-    #for label, value in zip(input_labels, state_input):
-    #    print(f"{label}: {value}")
-
     # Initial state
     if initials is None:
         initial_state = get_initial_state(mixing_ratio)
@@ -212,26 +141,23 @@ def ADM1_coAD(
                 S_gas_ch4,
                 S_gas_co2]
 
-
-    # Define the labels for each state variable
-    state_labels = [
-        "S_su", "S_aa", "S_fa", "S_va", "S_bu", "S_pro", "S_ac", "S_h2", "S_ch4",
-        "S_IC", "S_IN", "S_I", "X_xc1", "X_ch1", "X_pr1", "X_li1", "X_xc2", "X_ch2", 
-        "X_pr2", "X_li2", "X_su", "X_aa", "X_fa", "X_c4", "X_pro", "X_ac", "X_h2", 
-        "X_I", "S_cation", "S_anion", "S_H_ion", "S_va_ion", "S_bu_ion", "S_pro_ion", 
-        "S_ac_ion", "S_hco3_ion", "S_co2", "S_nh3", "S_nh4_ion", "S_gas_h2", 
-        "S_gas_ch4", "S_gas_co2"]
-
+    
+    # --- Set up reactor for this scenario ---
     reactor = reactor_setup(
     influent,               # Influent scenario function
     initial_state,          # Initial state scenario function
     q_ad_init,                # Initial influent flow rate [m^3/d]
     density,                    # Influent density [tonne/m^3]
-    VS_per_TS,                # Volatile solids per  total solids [kg VS/kg TS]    
+    VS_per_TS_PS,                # Volatile solids per  total solids [kg VS/kg TS]
+    VS_per_TS_SS,    
     TS_fraction,         # Fraction of water in influent
     mixing_ratio,   # Fraction for feed 1 # feed1 / total (can be overridden per scenario)
+    mixing_ratio2,
     OLR,                        # Organic Loading Rate [kg VS/m3/d]
-    recycle_ratio                # Recycle ratio [m^3/d]
+    recycle_ratio,                # Recycle ratio [m^3/d]
+    Batch_process,                # If True, simulate a batch process (no influent flow)
+    VSS,                            # Optional: pass custom VSS value
+    V_liq=V_liq,                            # Optional: pass custom reactor liquid volume [m^3]
     )
     # --- Set up reactor for this scenario ---
 
@@ -246,16 +172,88 @@ def ADM1_coAD(
     V_liq = reactor['V_liq']
     V_gas = reactor['V_gas']
     V_ad = reactor['V_ad']
+    TS = reactor['TS']
+    VSS = reactor['VSS']
+    TS_fraction_initial = reactor['TS_fraction_initial']
+
+
+
+    print("VS_in:", VS_in)
+    print("HRT:", HRT)
+    print("V_liq:", V_liq)
+    print("V_gas:", V_gas)
+    print("V_ad:", V_ad)
+    print("TS:", TS)
+    print("VSS:", VSS)
+    print("TS_fraction_initial:", TS_fraction_initial)
 
     # --- End  Reactor Setup ---
 
-    # Printing state_zero
-    #print("State Zero Values:")
-    #or label, value in zip(state_labels, state_zero):
-    #    print(f"{label}: {value}")
+    # Rescale influent concentrations to actual flow (preserve mass load)
+    new_influent = rescale_influent(mixing_ratio,influent, q_in, q_ad_init)
 
-    
-    S_nh4_ion =  (S_IN - S_nh3)
+
+    S_su_in = new_influent['S_su_in']
+    S_aa_in = new_influent['S_aa_in']
+    S_fa_in = new_influent['S_fa_in']
+    S_va_in = new_influent['S_va_in']
+    S_bu_in = new_influent['S_bu_in']
+    S_pro_in = new_influent['S_pro_in']
+    S_ac_in = new_influent['S_ac_in']
+    S_h2_in = new_influent['S_h2_in']
+    S_ch4_in = new_influent['S_ch4_in']
+    S_IC_in = new_influent['S_IC_in']
+    S_IN_in = new_influent['S_IN_in']
+    S_I_in = new_influent['S_I_in']
+    X_xc1_in = new_influent['X_xc1_in']
+    X_ch1_in = new_influent['X_ch1_in']
+    X_pr1_in = new_influent['X_pr1_in']
+    X_li1_in = new_influent['X_li1_in']
+    X_xc2_in = new_influent['X_xc2_in']
+    X_ch2_in = new_influent['X_ch2_in']
+    X_pr2_in = new_influent['X_pr2_in']
+    X_li2_in = new_influent['X_li2_in']
+    X_su_in = new_influent['X_su_in']
+    X_aa_in = new_influent['X_aa_in']
+    X_fa_in = new_influent['X_fa_in']
+    X_c4_in = new_influent['X_c4_in']
+    X_pro_in = new_influent['X_pro_in']
+    X_ac_in = new_influent['X_ac_in']
+    X_h2_in = new_influent['X_h2_in']
+    X_I_in = new_influent['X_I_in']
+    S_cation_in = new_influent['S_cation_in']
+    S_anion_in = new_influent['S_anion_in']
+
+    state_input = [S_su_in,
+                S_aa_in,
+                S_fa_in,
+                S_va_in,
+                S_bu_in,
+                S_pro_in,
+                S_ac_in,
+                S_h2_in,
+                S_ch4_in,
+                S_IC_in,
+                S_IN_in,
+                S_I_in,
+                X_xc1_in,
+                X_ch1_in,
+                X_pr1_in,
+                X_li1_in,
+                X_xc2_in,
+                X_ch2_in,
+                X_pr2_in,
+                X_li2_in,
+                X_su_in,
+                X_aa_in,
+                X_fa_in,
+                X_c4_in,
+                X_pro_in,
+                X_ac_in,
+                X_h2_in,
+                X_I_in,
+                S_cation_in,
+                S_anion_in]
 
     S_co2 =  (S_IC - S_hco3_ion)
 
@@ -270,10 +268,24 @@ def ADM1_coAD(
 
 
 
-    # Choose scenario: 'mesophilic_high_rate', 'mesophilic_solids', or 'thermophilic_solids'
-    params2 = PARAMETER_SETS["mesophilic_solids"]
+    # Choose parameter set based on operating temperature (K) -> (°C)
+    # Rule: 20–40°C => MESOPHILIC_SOLIDS, 45–70°C => THERMOPHILIC_SOLIDS, gap (40–45°C) defaults to mesophilic
+    T_C_sel = float(T_ad) - 273.15
+    if 20.0 <= T_C_sel <= 40.0:
+        selected_set = "mesophilic_solids"
+    elif 45.0 <= T_C_sel <= 70.0:
+        selected_set = "thermophilic_solids"
+    else:
+        # Default to mesophilic in the transition gap or outside specified bounds
+        selected_set = "mesophilic_solids"
+
+    params2 = PARAMETER_SETS[selected_set]
     set_global_params_from_dict(params2)
-    params=get_adm1_params(T_ad, T_base, params2, mixing_ratio)
+    params = get_adm1_params(T_ad, T_base, params2, mixing_ratio)
+
+    # Apply any caller-provided overrides after base/temperature-derived params are built
+    if isinstance(param_overrides, dict) and param_overrides:
+        params.update(param_overrides)
 
     params.update({
         'q_in': reactor['q_in'],
@@ -289,16 +301,15 @@ def ADM1_coAD(
         'V_ad': reactor['V_ad'],
         'OLR': reactor['OLR'],
         'density': reactor['density'],
-        'mixing_ratio': reactor['mixing_ratio']
+        'mixing_ratio': reactor['mixing_ratio'],
+        # Toggle for inhibition in ODE path
+        'disable_inhibition': disable_inhibition,
     })
 
     for k, v in params.items():
         globals()[k] = v
 
-    
-
-
-
+    # Local aliases for parameters use 
 
     # Initiate the cache data frame for storing simulation results
     simulate_results = pd.DataFrame([state_zero])
@@ -306,12 +317,28 @@ def ADM1_coAD(
     simulate_results.columns = columns
 
     # Initiate cache data frame for storing gasflow values
-    initflow = {'p_gas_h2': [0],'p_gas_ch4': [0],'p_gas_co2': [0],'p_gas': [0],'q_gas': [0], 'q_ch4': [0], 'total_ch4': [0],'p_gas_ch4/p_gas': [0],'p_gas_co2/p_gas': [0], 'ch4_yield':[0], 'co2_yield':[0] }
+    initflow = {'p_gas_h2': [0],'p_gas_ch4': [0],'p_gas_co2': [0],'p_gas': [0],'q_gas': [0], 'q_ch4': [0], 'total_ch4': [0],'p_gas_ch4/p_gas': [0],'p_gas_co2/p_gas': [0], 'ch4_yield':[0], 'co2_yield':[0], 'cumulative_methane_yield':[0], 'h2_yield':[0]}
     gasflow = pd.DataFrame(initflow)
     total_ch4 = 0
 
     # Initiate cache data frame for storing inhibition values
-    initflow = {'I_5': [0],'I_7': [0],'I_8': [0],'I_10': [0],'I_12': [0],'I_pH_aa': [0],'I_pH_h2': [0],'I_IN_lim': [0],'I_h2_fa': [0],'I_h2_c4': [0], 'I_h2_pro': [0]}
+    init_inhib_val = 1 if disable_inhibition else 0
+    initflow = {
+        'I_5': [init_inhib_val],
+        'I_6': [init_inhib_val],
+        'I_7': [init_inhib_val],
+        'I_8': [init_inhib_val],
+        'I_10': [init_inhib_val],
+        'I_12': [init_inhib_val],
+        'I_pH_aa': [init_inhib_val],
+        'I_pH_ac': [init_inhib_val],
+        'I_pH_h2': [init_inhib_val],
+        'I_IN_lim': [init_inhib_val],
+        'I_h2_fa': [init_inhib_val],
+        'I_h2_c4': [init_inhib_val],
+        'I_h2_pro': [init_inhib_val],
+        'I_nh3': [init_inhib_val],
+    }
     inhibition = pd.DataFrame(initflow)
 
     # Initiate cache data frame for storing ions values
@@ -320,9 +347,19 @@ def ADM1_coAD(
 
     ##############################
     ##time definition
-    days = 50
-    timeSteps = days*24 #every 15 minutes 
-    t = np.linspace(0, days, timeSteps) #sequence of timesteps as fractions of days
+
+    timeSteps_sets = {
+    "Day(s)": days,
+    "15 Minute(s)": days*24*4,
+    "Hour(s)": days*24,
+}
+    
+   
+
+    selected_timeSteps = timeSteps_sets[timesteps] #every 1 hour 
+
+
+    t = np.linspace(0, days, selected_timeSteps) #sequence of timesteps as fractions of days
 
 
 
@@ -330,32 +367,39 @@ def ADM1_coAD(
     # solvermethod = 'BDF'
 
     # --- Recycle stream integration ---
-    # Initialize effluent_state for recycling (use initial state for first step)
- 
+    # Each step, compute fresh+recycle mixed influent using flow-weighted average
+    # Also record the mixed influent so users can inspect its evolution over time
+    mixed_influent_records = []
 
     for u in t[1:]:
         n += 1
 
+        # Effluent state MUST use base (no *_in) names. Influent uses *_in names.
         effluent_state = {
-        'S_su_in': S_su, 'S_aa_in': S_aa, 'S_fa_in': S_fa, 'S_va_in': S_va, 'S_bu_in': S_bu, 'S_pro_in': S_pro,
-        'S_ac_in': S_ac, 'S_h2_in': S_h2, 'S_ch4_in': S_ch4, 'S_IC_in': S_IC, 'S_IN_in': S_IN, 'S_I_in': S_I,
-        'X_xc1_in': X_xc1, 'X_ch1_in': X_ch1, 'X_pr1_in': X_pr1, 'X_li1_in': X_li1, 'X_xc2_in': X_xc2,
-        'X_ch2_in': X_ch2, 'X_pr2_in': X_pr2, 'X_li2_in': X_li2, 'X_su_in': X_su, 'X_aa_in': X_aa,
-        'X_fa_in': X_fa, 'X_c4_in': X_c4, 'X_pro_in': X_pro, 'X_ac_in': X_ac, 'X_h2_in': X_h2,
-        'X_I_in': X_I, 'S_cation_in': S_cation, 'S_anion_in': S_anion
+            'S_su': S_su, 'S_aa': S_aa, 'S_fa': S_fa, 'S_va': S_va, 'S_bu': S_bu, 'S_pro': S_pro,
+            'S_ac': S_ac, 'S_h2': S_h2, 'S_ch4': S_ch4, 'S_IC': S_IC, 'S_IN': S_IN, 'S_I': S_I,
+            'X_xc1': X_xc1, 'X_ch1': X_ch1, 'X_pr1': X_pr1, 'X_li1': X_li1, 'X_xc2': X_xc2,
+            'X_ch2': X_ch2, 'X_pr2': X_pr2, 'X_li2': X_li2, 'X_su': X_su, 'X_aa': X_aa,
+            'X_fa': X_fa, 'X_c4': X_c4, 'X_pro': X_pro, 'X_ac': X_ac, 'X_h2': X_h2,
+            'X_I': X_I, 'S_cation': S_cation, 'S_anion': S_anion
         }
-        # Mix recycled effluent with fresh influent
-        mixed_influent = {}
-        for key in effluent_state:
-            mixed_influent[key] = recycle_ratio * effluent_state[key] + (1 - recycle_ratio) * influent[key] if influent and key in influent else effluent_state[key]
+
+        # Flow-weighted mixing using helper ( (q_in * fresh + q_r * effluent)/q_ad )
+        mixed_influent = mix_influent_with_recycle(new_influent, effluent_state, q_in, q_r, q_ad)
+
+        # Record history (add time for traceability)
+        rec = {'time': u}
+        rec.update(mixed_influent)
+        mixed_influent_records.append(rec)
+
 
         # Update state_input for this time step
         state_input = [mixed_influent['S_su_in'], mixed_influent['S_aa_in'], mixed_influent['S_fa_in'], mixed_influent['S_va_in'], mixed_influent['S_bu_in'], mixed_influent['S_pro_in'], 
-                    mixed_influent['S_ac_in'], mixed_influent['S_h2_in'], mixed_influent['S_ch4_in'], mixed_influent['S_IC_in'], mixed_influent['S_IN_in'], mixed_influent['S_I_in'],
-                    mixed_influent['X_xc1_in'], mixed_influent['X_ch1_in'], mixed_influent['X_pr1_in'], mixed_influent['X_li1_in'], mixed_influent['X_xc2_in'], 
-                    mixed_influent['X_ch2_in'], mixed_influent['X_pr2_in'], mixed_influent['X_li2_in'], mixed_influent['X_su_in'], mixed_influent['X_aa_in'], 
-                    mixed_influent['X_fa_in'], mixed_influent['X_c4_in'], mixed_influent['X_pro_in'], mixed_influent['X_ac_in'], mixed_influent['X_h2_in'], 
-                    mixed_influent['X_I_in'], mixed_influent['S_cation_in'], mixed_influent['S_anion_in']]
+                       mixed_influent['S_ac_in'], mixed_influent['S_h2_in'], mixed_influent['S_ch4_in'], mixed_influent['S_IC_in'], mixed_influent['S_IN_in'], mixed_influent['S_I_in'],
+                       mixed_influent['X_xc1_in'], mixed_influent['X_ch1_in'], mixed_influent['X_pr1_in'], mixed_influent['X_li1_in'], mixed_influent['X_xc2_in'], 
+                       mixed_influent['X_ch2_in'], mixed_influent['X_pr2_in'], mixed_influent['X_li2_in'], mixed_influent['X_su_in'], mixed_influent['X_aa_in'], 
+                       mixed_influent['X_fa_in'], mixed_influent['X_c4_in'], mixed_influent['X_pro_in'], mixed_influent['X_ac_in'], mixed_influent['X_h2_in'], 
+                       mixed_influent['X_I_in'], mixed_influent['S_cation_in'], mixed_influent['S_anion_in']]
 
         # Span for next time step
         tstep = [t0, u]
@@ -403,6 +447,7 @@ def ADM1_coAD(
         
         new_state, pH_value = DAESolve(state_for_dae,state_input,params)
 
+
         # Overwrite updated components from new_state (others unchanged)
         S_h2 = new_state[7]
         S_H_ion = new_state[30]
@@ -418,24 +463,38 @@ def ADM1_coAD(
 
         prevS_H_ion = S_H_ion
 
-        I_pH_aa =  ((K_pH_aa ** nn_aa) / (S_H_ion ** nn_aa + K_pH_aa ** nn_aa))
-        I_pH_ac =  ((K_pH_ac ** n_ac) / (S_H_ion ** n_ac + K_pH_ac ** n_ac))
-        I_pH_h2 =  ((K_pH_h2 ** n_h2) / (S_H_ion ** n_h2 + K_pH_h2 ** n_h2))
-        I_IN_lim =  (1 / (1 + (K_S_IN / S_IN)))
-        I_h2_fa =  (1 / (1 + (S_h2 / K_I_h2_fa)))
-        I_h2_c4 =  (1 / (1 + (S_h2 / K_I_h2_c4)))
-        I_h2_pro =  (1 / (1 + (S_h2 / K_I_h2_pro)))
-        I_nh3 =  (1 / (1 + (S_nh3 / K_I_nh3)))
+         # Base inhibition factors via shared utility
 
-        I_5 = I_pH_aa * I_IN_lim
-        I_6 = I_5
-        I_7 = I_pH_aa * I_IN_lim * I_h2_fa
-        I_8 = I_pH_aa * I_IN_lim * I_h2_c4
-        I_9 = I_8
-        I_10 = I_pH_aa * I_IN_lim * I_h2_pro
-        I_12 = I_pH_h2 * I_IN_lim
 
-        inhibittemp = {'I_5': I_5,'I_7': I_7,'I_8': I_8,'I_10': I_10,'I_12': I_12, 'I_pH_aa': I_pH_aa,'I_pH_ac': I_pH_ac,'I_pH_h2': I_pH_h2, 'I_IN_lim': I_IN_lim,'I_h2_fa': I_h2_fa,'I_h2_c4': I_h2_c4,'I_h2_pro': I_h2_pro,'I_nh3': I_nh3}
+        inhib = compute_inhibition_factors(
+            S_H_ion=S_H_ion,
+            S_IN=S_IN,
+            S_h2=S_h2,
+            S_nh3=S_nh3,
+            params=params,
+            disable_inhibition=disable_inhibition,
+        )
+
+        I_pH_aa = inhib['I_pH_aa']
+        I_pH_ac = inhib['I_pH_ac']
+        I_pH_h2 = inhib['I_pH_h2']
+        I_IN_lim = inhib['I_IN_lim']
+        I_h2_fa = inhib['I_h2_fa']
+        I_h2_c4 = inhib['I_h2_c4']
+        I_h2_pro = inhib['I_h2_pro']
+        I_nh3 = inhib['I_nh3']
+
+        I_5 = inhib['I_5']
+        I_6 = inhib['I_6']
+        I_7 = inhib['I_7']
+        I_8 = inhib['I_8']
+        I_9 = inhib['I_9']
+        I_10 = inhib['I_10']
+        I_11 = inhib['I_11']
+        I_12 = inhib['I_12']
+
+        # Store all computed inhibition factors for consistency and maintainability
+        inhibittemp = {'I_5': I_5,'I_6': I_6,'I_7': I_7,'I_8': I_8,'I_9': I_9,'I_10': I_10,'I_11': I_11,'I_12': I_12, 'I_pH_aa': I_pH_aa,'I_pH_ac': I_pH_ac,'I_pH_h2': I_pH_h2, 'I_IN_lim': I_IN_lim,'I_h2_fa': I_h2_fa,'I_h2_c4': I_h2_c4,'I_h2_pro': I_h2_pro,'I_nh3': I_nh3}
         inhibition = pd.concat([inhibition, pd.DataFrame([inhibittemp])], ignore_index=True)
 
         ################
@@ -467,11 +526,15 @@ def ADM1_coAD(
         q_h2 = q_gas * (p_gas_h2/p_gas) # h2 flow
 
         if q_ch4 < 0:
+            q_ch4 = q_gas * (p_gas_co2/p_gas) # co2 flow
+        q_h2 = q_gas * (p_gas_h2/p_gas) # h2 flow
+
+        if q_ch4 < 0:
             q_ch4 = 0
 
         total_ch4 = total_ch4 + q_ch4 
 
-        flowtemp = {'p_gas_h2': p_gas_h2,'p_gas_ch4': p_gas_ch4,'p_gas_co2': p_gas_co2,'p_gas': p_gas,'q_gas': q_gas, 'q_ch4': q_ch4, 'total_ch4': total_ch4, 'p_gas_ch4/p_gas': p_gas_ch4/p_gas,'p_gas_co2/p_gas': p_gas_co2/p_gas, 'ch4_yield':q_ch4/VS_in, 'co2_yield':q_co2/VS_in, 'h2_yield':q_h2/VS_in}
+        flowtemp = {'p_gas_h2': p_gas_h2,'p_gas_ch4': p_gas_ch4,'p_gas_co2': p_gas_co2,'p_gas': p_gas,'q_gas': q_gas, 'q_ch4': q_ch4, 'total_ch4': total_ch4, 'p_gas_ch4/p_gas': p_gas_ch4/p_gas,'p_gas_co2/p_gas': p_gas_co2/p_gas, 'ch4_yield':q_ch4/VS_in,  'co2_yield':q_co2/VS_in, 'cumulative_methane_yield': total_ch4 / VS_in, 'h2_yield':q_h2/VS_in}
         gasflow = pd.concat([gasflow, pd.DataFrame([flowtemp])], ignore_index=True)
 
         total_ch4 = total_ch4 + q_ch4     
@@ -492,7 +555,11 @@ def ADM1_coAD(
 
         dfstate_zero = pd.DataFrame([state_zero], columns=columns)
         simulate_results = pd.concat([simulate_results, dfstate_zero], ignore_index=True)
-        t0 = u
+        print(u)
+        t0 = u 
+
+    # End of time loop
+    ##############################
 
     p_gas_h2 =  (S_gas_h2 * R * T_op / 16)
     p_gas_ch4 =  (S_gas_ch4 * R * T_op / 64)
@@ -500,7 +567,7 @@ def ADM1_coAD(
     Rho_T_8 =  (k_L_a * (S_h2 - 16 * K_H_h2 * p_gas_h2))
     Rho_T_9 =  (k_L_a * (S_ch4 - 64 * K_H_ch4 * p_gas_ch4))
     Rho_T_10 =  (k_L_a * (S_co2 - K_H_co2 * p_gas_co2))
-        
+                
     p_gas=  (p_gas_h2 + p_gas_ch4 + p_gas_co2 + p_gas_h2o)
     q_gas =  (k_p * (p_gas- p_atm))
 
@@ -512,15 +579,24 @@ def ADM1_coAD(
     q_ch4 = q_gas * (p_gas_ch4/p_gas) # methane flow
     if q_ch4 < 0:
         q_ch4 = 0
-  
+
     phlogarray = -1 * np.log10(simulate_results['pH'])
     simulate_results['pH'] = phlogarray
-    
+            
 
+    VS_out=get_VSS(simulate_results.iloc[-1],q_out)
 
+    VS_reduction=(VS_in-VS_out)*100/VS_in
 
     return {
+        "new_influent": new_influent,
+        "VS_reduction": VS_reduction,
+        "VS_out": VS_out,
         "simulate_results": simulate_results,
+        "gasflow": gasflow,
+        "inhibition": inhibition,
+        "mixed_influent_history": pd.DataFrame(mixed_influent_records),
+        "u": t,
         "S_su": S_su,
         "S_aa": S_aa,
         "S_fa": S_fa,
@@ -569,10 +645,21 @@ def ADM1_coAD(
         "p_gas": p_gas,
         "q_gas": q_gas,
         "q_ch4": q_ch4,
+        "cumulative_methane_yield": total_ch4 / VS_in,
         "biomethane_yield": q_ch4 / VS_in,
         "biomethane_yield2": q_ch4 / V_ad,
         "q_in": q_in,
         "q_out": q_out,
         "q_recycle": q_r,
-        "HRT": HRT
+        "HRT": HRT,
+        'q_in1': q_in1,
+        'q_in2': q_in2,
+        'q_ad': q_ad,
+        'VS_in': VS_in,
+        'V_liq': V_liq,
+        'V_gas': V_gas,
+        'V_ad': V_ad,
+        'TS': TS,
+        'VSS': VSS,
+        'TS_fraction_initial': TS_fraction_initial
     }

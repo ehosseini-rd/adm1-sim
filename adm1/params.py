@@ -1,5 +1,4 @@
 import numpy as np
-from adm1.influent import get_influent
 from adm1.initial_state import get_initial_state
 
 
@@ -10,8 +9,8 @@ from adm1.initial_state import get_initial_state
 MESOPHILIC_HIGH_RATE = {
 	"k_dis1": 0.4, #d^-1
     "k_dis2": 0.4, #d^-1
-	"k_hyd_ch1": 0.25, #d^-1
-	"k_hyd_pr1": 0.2, #d^-1
+	"k_hyd_ch1": 0.1, #d^-1
+	"k_hyd_pr1": 0.1, #d^-1
 	"k_hyd_li1": 0.1, #d^-1
     "k_hyd_ch2": 5.22, #d^-1
 	"k_hyd_pr2": 1.86, #d^-1
@@ -130,9 +129,9 @@ MESOPHILIC_SOLIDS = {
 THERMOPHILIC_SOLIDS = {
 	"k_dis1": 1.0 , #d^-1
     "k_dis2": 1.0 , #d^-1
-	"k_hyd_ch1": 10, #d^-1
-	"k_hyd_pr1": 10, #d^-1
-	"k_hyd_li1": 10, #d^-1
+	"k_hyd_ch1": 0.1, #d^-1
+	"k_hyd_pr1": 0.1, #d^-1
+	"k_hyd_li1": 0.1, #d^-1
     "k_hyd_ch2": 5.22, #d^-1
 	"k_hyd_pr2": 1.86, #d^-1
 	"k_hyd_li2": 1.24, #d^-1
@@ -311,123 +310,100 @@ def get_adm1_params(T_ad, T_base, parameter_set, mixing_ratio):
         return params
 
 
-def get_VSS(    
-            influent=None,              # Optional: pass custom influent dict
-            initials=None,
-            mixing_ratio=0.9999              # Optional: pass custom initial state dict
-):
-        lambda_X_ch=1.18  # kg COD.kg biomass-1
-        lambda_X_pr= 1.53  # kg COD.kg biomass-1
-        lambda_X_li= 2.87  # kg COD.kg biomass-1
-        lambda_X_su= 1.41  # kg COD.kg biomass-1
-        lambda_X_aa= 1.41  # kg COD.kg biomass-1
-        lambda_X_fa= 1.41  # kg COD.kg biomass-1
-        lambda_X_c4= 1.41  # kg COD.kg biomass-1
-        lambda_X_pro= 1.41 # kg COD.kg biomass-1
-        lambda_X_ac= 1.41   # kg COD.kg biomass-1
+
+def get_VSS(influent, q):
+    """
+    Calculate VSS as the sum of lambda values multiplied by corresponding influent biomass fractions.
+    Args:
+        influent (dict): Dictionary containing influent values for each biomass fraction.
+    Returns:
+        float: Total VSS value.
+    """
+    lambda_dict = {
+        'S_su_in': 1.07,
+        'S_aa_in': 1.53,
+        'S_fa_in': 2.87,
+        'S_va_in': 2.04,
+        'S_bu_in': 1.82,
+        'S_pro_in': 1.51,
+        'S_ac_in': 1.07,
+        'X_ch1_in': 1.18,
+        'X_ch2_in': 1.18,
+        'X_pr1_in': 1.53,
+        'X_pr2_in': 1.53,
+        'X_li1_in': 2.87,
+        'X_li2_in': 2.87,
+        'X_I_in': 1.18,
+        'X_I1_in': 1.18,
+        'X_I2_in': 1.18,
+        #######
+
+        'X_su': 1.41,
+        'X_aa': 1.41,
+        'X_fa': 1.41,
+        'X_c4': 1.41,
+        'X_pro': 1.41,
+        'X_ac': 1.41,
+        'X_h2': 1.41,
+        'S_su': 1.07,
+        'S_aa': 1.53,
+        'S_fa': 2.87,
+        'S_va': 2.04,
+        'S_va_ion': 1.98,
+        'S_bu': 1.82,
+        'S_bu_ion': 1.75,
+        'S_pro': 1.51,
+        'S_pro_ion': 1.42,
+        'S_ac': 1.07,
+        'S_ac_ion': 0.95,
+        'X_ch1': 1.18,
+        'X_ch2': 1.18,
+        'X_pr1': 1.53,
+        'X_pr2': 1.53,
+        'X_li1': 2.87,
+        'X_li2': 2.87,
+        'X_I': 1.18,
+        'S_h2': 7.94,
+        'S_ch4': 3.99
+    }
+    VSS = 0.0
+    for key, lam in lambda_dict.items():
+        VSS += q*0.001 * influent.get(key, 0)/lam #tonne/day
+    return VSS
 
 
-        if influent is None:
-             influent = get_influent(mixing_ratio)
-        else:
-             influent = influent
 
-        S_su_in = influent['S_su_in']
-        S_aa_in = influent['S_aa_in']
-        S_fa_in = influent['S_fa_in']
-        S_va_in = influent['S_va_in']
-        S_bu_in = influent['S_bu_in']
-        S_pro_in = influent['S_pro_in']
-        S_ac_in = influent['S_ac_in']
-        S_h2_in = influent['S_h2_in']
-        S_ch4_in = influent['S_ch4_in']
-        S_IC_in = influent['S_IC_in']
-        S_IN_in = influent['S_IN_in']
-        S_I_in = influent['S_I_in']
-        X_xc1_in = influent['X_xc1_in']
-        X_ch1_in = influent['X_ch1_in']
-        X_pr1_in = influent['X_pr1_in']
-        X_li1_in = influent['X_li1_in']
-        X_xc2_in = influent['X_xc2_in']
-        X_ch2_in = influent['X_ch2_in']
-        X_pr2_in = influent['X_pr2_in']
-        X_li2_in = influent['X_li2_in']
-        X_su_in = influent['X_su_in']
-        X_aa_in = influent['X_aa_in']
-        X_fa_in = influent['X_fa_in']
-        X_c4_in = influent['X_c4_in']
-        X_pro_in = influent['X_pro_in']
-        X_ac_in = influent['X_ac_in']
-        X_h2_in = influent['X_h2_in']
-        X_I_in = influent['X_I_in']
-        S_cation_in = influent['S_cation_in']
-        S_anion_in = influent['S_anion_in']
+# Mass fractions for C and N from Table S.1 (per unit mass)
+# Only main organic components included; extend as needed
+ADM1_MASS_FRACTIONS = {
+    'X_ch1_in': (0.4445/1.18, 0.0000),  # Carbohydrates
+    'X_pr1_in': (0.5497/1.53, 0.1603/1.53),  # Proteins
+    'X_li1_in': (0.7587/2.87, 0.0000/2.87),  # Lipids
+    'X_ch2_in': (0.4445/1.18, 0.0000),  # Carbohydrates
+    'X_pr2_in': (0.5497/1.53, 0.1603/1.53),  # Proteins
+    'X_li2_in': (0.7587/2.87, 0.0000),  # Lipids
+    'X_I_in': (0.4445/1.18, 0.0000),  # Inerts
+    'S_IN_in': (0.0000, 0.7995*18),  # Inorganic nitrogen
 
-        # Initial state
-        if initials is None:
-            initial_state = get_initial_state(mixing_ratio)
-        else:
-            initial_state = initials
+    # Add more as needed
+}
 
-        S_su=initial_state['S_su']
-        S_aa=initial_state['S_aa']
-        S_fa=initial_state['S_fa']
-        S_va=initial_state['S_va']
-        S_bu=initial_state['S_bu']
-        S_pro=initial_state['S_pro']
-        S_ac=initial_state['S_ac']
-        S_h2=initial_state['S_h2']
-        S_ch4=initial_state['S_ch4']
-        S_IC=initial_state['S_IC']
-        S_IN=initial_state['S_IN']
-        S_I=initial_state['S_I']
-        X_xc1=initial_state['X_xc1']
-        X_ch1=initial_state['X_ch1']
-        X_pr1=initial_state['X_pr1']
-        X_li1=initial_state['X_li1']
-        X_xc2=initial_state['X_xc2']
-        X_ch2=initial_state['X_ch2']
-        X_pr2=initial_state['X_pr2']
-        X_li2=initial_state['X_li2']
-        X_su=initial_state['X_su']
-        X_aa=initial_state['X_aa']
-        X_fa=initial_state['X_fa']
-        X_c4=initial_state['X_c4']
-        X_pro=initial_state['X_pro']
-        X_ac=initial_state['X_ac']
-        X_h2=initial_state['X_h2']
-        X_I=initial_state['X_I']
-        S_cation=initial_state['S_cation']
-        S_anion=initial_state['S_anion']
-        pH=initial_state['pH']
-        S_H_ion=initial_state['S_H_ion']
-        S_va_ion=initial_state['S_va_ion']
-        S_bu_ion=initial_state['S_bu_ion']
-        S_pro_ion=initial_state['S_pro_ion']
-        S_ac_ion=initial_state['S_ac_ion']
-        S_hco3_ion=initial_state['S_hco3_ion']
-        S_nh3=initial_state['S_nh3']
-        S_nh4_ion=initial_state['S_nh4_ion']
-        S_co2=initial_state['S_co2']
-        S_gas_h2=initial_state['S_gas_h2']
-        S_gas_ch4=initial_state['S_gas_ch4']
-        S_gas_co2=initial_state['S_gas_co2']
-
-
-        VSS= X_ch1_in/lambda_X_ch+X_ch2_in/lambda_X_ch+ X_pr1_in/lambda_X_pr+X_pr2_in/lambda_X_pr+X_li1_in/lambda_X_li+X_li2_in/lambda_X_li+X_su/lambda_X_su+X_aa/lambda_X_aa+X_fa/lambda_X_fa+X_c4/lambda_X_c4+X_pro/lambda_X_pro+X_ac/lambda_X_ac
-
-        # Lambda values for particulate biomass components in ADM1
-        # Each lambda_X_* represents the conversion factor from biomass to COD (kg COD per kg biomass)
-        # These are used for stoichiometric calculations in the ADM1 model
-        # Units: kg COD / kg biomass
-        return {
-            'lambda_X_ch': 1.18,  # Carbohydrate
-            'lambda_X_pr': 1.53,  # Protein
-            'lambda_X_li': 2.87,  # Lipid
-            'lambda_X_su': 1.41,  # Sugar
-            'lambda_X_aa': 1.41,  # Amino acid
-            'lambda_X_fa': 1.41,  # Fatty acid
-            'lambda_X_c4': 1.41,  # Butyrate/Valerate
-            'lambda_X_pro': 1.41, # Propionate
-            'lambda_X_ac': 1.41   # Acetate
-        }
+def calculate_CN_ratio(influent, mass_fractions=ADM1_MASS_FRACTIONS):
+    """
+    Calculate the C/N ratio from influent composition and mass fractions.
+    influent: dict, keys are component names, values are concentrations (e.g., kg/m3)
+    mass_fractions: dict, keys are component names, values are (C_content, N_content) per unit mass
+    Returns: dict with C/N ratio, total C, and total N
+    """
+    total_C = 0.0
+    total_N = 0.0
+    for comp, conc in influent.items():
+        if comp in mass_fractions:
+            C_content, N_content = mass_fractions[comp]
+            total_C += conc * C_content
+            total_N += conc * N_content
+    if total_N == 0:
+        cn_ratio = float('inf')
+    else:
+        cn_ratio = total_C / total_N
+    return {"C/N ratio": cn_ratio, "total_C": total_C, "total_N": total_N}

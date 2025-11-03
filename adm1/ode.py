@@ -4,6 +4,8 @@
 # Function for calculating the derivatives related to ADM1 system of equations from the Rosen et al (2006) BSM2 report.
 # state_zero: current dynamic state vector (length 42)
 # state_input: influent / feed state vector (length 30) for this timestep
+
+
 def ADM1_ODE(t, state_zero, state_input,params):
   for k, v in params.items():
     globals()[k] = v
@@ -90,35 +92,27 @@ def ADM1_ODE(t, state_zero, state_input,params):
 
   S_co2 =  (S_IC - S_hco3_ion)
 
-  #I_pH_aa =  ((K_pH_aa ** nn_aa) / (S_H_ion ** nn_aa + K_pH_aa ** nn_aa))
-  #I_pH_ac =  ((K_pH_ac ** n_ac) / (S_H_ion ** n_ac + K_pH_ac ** n_ac))
-  #I_pH_h2 =  ((K_pH_h2 ** n_h2) / (S_H_ion ** n_h2 + K_pH_h2 ** n_h2))
-  #I_IN_lim =  (1 / (1 + (K_S_IN / S_IN)))
-  #I_h2_fa =  (1 / (1 + (S_h2 / K_I_h2_fa)))
-  #I_h2_c4 =  (1 / (1 + (S_h2 / K_I_h2_c4)))
-  #I_h2_pro =  (1 / (1 + (S_h2 / K_I_h2_pro)))
-  #I_nh3 =  (1 / (1 + (S_nh3 / K_I_nh3)))
-  
-  I_pH_aa =  1
-  I_pH_ac =  1
-  I_pH_h2 =  1
-  I_IN_lim =  1
-  I_h2_fa =  1
-  I_h2_c4 =  1
-  I_h2_pro =  1
-  I_nh3 =  1
+  # Base inhibition factors via shared utility
+  from .inhibition import compute_inhibition_factors
 
-  I_5 =  (I_pH_aa * I_IN_lim)
-  I_6 = I_5
-  I_7 =  (I_pH_aa * I_IN_lim * I_h2_fa)
-  I_8 =  (I_pH_aa * I_IN_lim * I_h2_c4)
-  I_9 = I_8
-  I_10 =  (I_pH_aa * I_IN_lim * I_h2_pro)
-  I_11 =  (I_pH_ac * I_IN_lim * I_nh3)
-  I_12 =  (I_pH_h2 * I_IN_lim)
-    
+  inhib = compute_inhibition_factors(
+    S_H_ion=S_H_ion,
+    S_IN=S_IN,
+    S_h2=S_h2,
+    S_nh3=S_nh3,
+    params=params,
+    disable_inhibition=params.get('disable_inhibition', False),
+  )
 
 
+  I_5 = inhib["I_5"]
+  I_6 = inhib["I_6"]
+  I_7 = inhib["I_7"]
+  I_8 = inhib["I_8"]
+  I_9 = inhib["I_9"]
+  I_10 = inhib["I_10"]
+  I_11 = inhib["I_11"]
+  I_12 = inhib["I_12"]
  
 
   # biochemical process rates from Rosen et al (2006) BSM2 report
@@ -250,21 +244,21 @@ def ADM1_ODE(t, state_zero, state_input,params):
 
 
   # Differential equations 13 to 24 (particulate matter)
-  diff_X_xc1 = q_ad1 / (mixing_ratio * V_liq) * (X_xc1_in - X_xc1) - Rho_1_1 + mixing_ratio * (Rho_13 + Rho_14 + Rho_15 + Rho_16 + Rho_17 + Rho_18 + Rho_19)  # eq13 
+  diff_X_xc1 = q_in1 / (mixing_ratio * V_liq) * (X_xc1_in - X_xc1) - Rho_1_1 + mixing_ratio * (Rho_13 + Rho_14 + Rho_15 + Rho_16 + Rho_17 + Rho_18 + Rho_19)  # eq13 
 
-  diff_X_xc2 = q_ad2 / ((1-mixing_ratio) * V_liq) * (X_xc2_in - X_xc2) - Rho_1_2 + (1-mixing_ratio) * (Rho_13 + Rho_14 + Rho_15 + Rho_16 + Rho_17 + Rho_18 + Rho_19)  # eq13 
+  diff_X_xc2 = q_in2 / ((1-mixing_ratio) * V_liq) * (X_xc2_in - X_xc2) - Rho_1_2 + (1-mixing_ratio) * (Rho_13 + Rho_14 + Rho_15 + Rho_16 + Rho_17 + Rho_18 + Rho_19)  # eq13 
 
-  diff_X_ch1 = q_ad1 / (mixing_ratio * V_liq) * (X_ch1_in - X_ch1) + f_ch_xc1 * Rho_1_1 - Rho_2_1  # eq14
+  diff_X_ch1 = q_in1 / (mixing_ratio * V_liq) * (X_ch1_in - X_ch1) + f_ch_xc1 * Rho_1_1 - Rho_2_1  # eq14
 
-  diff_X_ch2 = q_ad2 / ((1-mixing_ratio) * V_liq) * (X_ch2_in - X_ch2) + f_ch_xc2 * Rho_1_2 - Rho_2_2  # eq14
+  diff_X_ch2 = q_in2 / ((1-mixing_ratio) * V_liq) * (X_ch2_in - X_ch2) + f_ch_xc2 * Rho_1_2 - Rho_2_2  # eq14
 
-  diff_X_pr1 = q_ad1 / (mixing_ratio * V_liq) * (X_pr1_in - X_pr1) + f_pr_xc1 * Rho_1_1 - Rho_3_1    # eq15 
+  diff_X_pr1 = q_in1 / (mixing_ratio * V_liq) * (X_pr1_in - X_pr1) + f_pr_xc1 * Rho_1_1 - Rho_3_1    # eq15 
 
-  diff_X_pr2 = q_ad2 / ((1-mixing_ratio) * V_liq) * (X_pr2_in - X_pr2) + f_pr_xc2 * Rho_1_2 - Rho_3_2   # eq15 
+  diff_X_pr2 = q_in2 / ((1-mixing_ratio) * V_liq) * (X_pr2_in - X_pr2) + f_pr_xc2 * Rho_1_2 - Rho_3_2   # eq15 
 
-  diff_X_li1 = q_ad1 / (mixing_ratio * V_liq) * (X_li1_in - X_li1) + f_li_xc1 * Rho_1_1 - Rho_4_1    # eq16 
+  diff_X_li1 = q_in1 / (mixing_ratio * V_liq) * (X_li1_in - X_li1) + f_li_xc1 * Rho_1_1 - Rho_4_1    # eq16 
 
-  diff_X_li2 = q_ad2 / ((1-mixing_ratio) * V_liq) * (X_li2_in - X_li2) + f_li_xc2 * Rho_1_2 - Rho_4_2   # eq16 
+  diff_X_li2 = q_in2 / ((1-mixing_ratio) * V_liq) * (X_li2_in - X_li2) + f_li_xc2 * Rho_1_2 - Rho_4_2   # eq16 
   
   diff_X_su = q_ad / V_liq * (X_su_in - X_su) + Y_su * Rho_5 - Rho_13  # eq17
 

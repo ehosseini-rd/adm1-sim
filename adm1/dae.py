@@ -65,7 +65,11 @@ def DAESolve(state, state_input, params):
                     (K_a_ac * S_ac)/(64*(K_a_ac + S_H_ion)**2) + (K_a_pro * S_pro)/(112*(K_a_pro + S_H_ion)**2) +
                     (K_a_bu * S_bu)/(160*(K_a_bu + S_H_ion)**2) + (K_a_va * S_va)/(208*(K_a_va + S_H_ion)**2) +
                     K_w / S_H_ion**2)
+        
+
+
         S_H_ion -= shdelta / shgradeq
+            
         if S_H_ion <= 0: S_H_ion = tol
         i += 1
     pH_value = -np.log10(S_H_ion)
